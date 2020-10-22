@@ -63,7 +63,7 @@ class TauSrAnalyzer(KpiAnalyzer):
         self.register_kpi("Mobility", "TAU_SR", self.__emm_sr_callback)
         self.register_kpi("Mobility", "TAU_REQ", self.__emm_sr_callback,
                           list(self.kpi_measurements['total_number'].keys()))
-        self.register_kpi("Mobility", "TAU_SR_LATENCY", self.__emm_sr_callback,
+        self.register_kpi("Mobility", "TAU_LATENCY", self.__emm_sr_callback,
                           None)
         self.register_kpi("Retainability", "TAU_REJ", self.__emm_sr_callback,
                           list(self.kpi_measurements['reject_number'].keys()))
@@ -83,6 +83,7 @@ class TauSrAnalyzer(KpiAnalyzer):
         """
         KpiAnalyzer.set_source(self,source)
         #enable LTE EMM logs
+        source.enable_log("LTE_NAS_EMM_State")
         source.enable_log("LTE_NAS_EMM_OTA_Incoming_Packet")
         source.enable_log("LTE_NAS_EMM_OTA_Outgoing_Packet")
 
@@ -106,6 +107,31 @@ class TauSrAnalyzer(KpiAnalyzer):
 
         # print 'log'
 
+        if msg.type_id == "LTE_NAS_EMM_State":
+            log_item = msg.data.decode()
+            log_item_dict = dict(log_item)
+            # print(log_item_dict)
+            if self.tau_req_flag and log_item_dict["EMM State"] == 'EMM_REGISTERED': # 'EMM State': 'EMM_REGISTERED'
+                self.kpi_measurements['success_number']['TOTAL'] += 1
+
+                # self.__calculate_kpi()
+                # self.log_info("TAU_SR: " + str(self.kpi_measurements))
+                self.store_kpi("KPI_Mobility_TAU_SUC",
+                            self.kpi_measurements['success_number'], log_item_dict['timestamp'])
+
+                upload_dict = {
+                    'total_number': self.kpi_measurements['total_number']['TOTAL'],
+                    'success_number': self.kpi_measurements['success_number']['TOTAL']}
+                # self.upload_kpi('KPI.Mobility.TAU_SR', upload_dict)
+                self.tau_req_flag = False
+
+                # TAU latency
+                delta_time = (log_item_dict['timestamp']-self.tau_req_timestamp).total_seconds() * 1000
+                if delta_time >= 0:
+                    upload_dict = {'latency': delta_time}
+                    self.store_kpi("KPI_Mobility_TAU_LATENCY",
+                                           delta_time, log_item_dict['timestamp'])
+
         cell_id = self.get_analyzer('TrackCellInfoAnalyzer').get_cur_cell_id()
         if cell_id != self.cell_id:
             self.cell_id = cell_id
@@ -122,27 +148,12 @@ class TauSrAnalyzer(KpiAnalyzer):
                     if proto.get('name') == 'nas-eps':
                         for field in proto.iter('field'):
                             # '49' indicates Tracking area update accept
-                            if field.get('name') == 'nas_eps.nas_msg_emm_type' and field.get('value') == '49' and self.tau_req_flag:
-                                self.kpi_measurements['success_number']['TOTAL'] += 1
-
-                                # self.__calculate_kpi()
-                                # self.log_info("TAU_SR: " + str(self.kpi_measurements))
-                                self.store_kpi("KPI_Mobility_TAU_SUC",
-                                            self.kpi_measurements['success_number'], log_item_dict['timestamp'])
-                                upload_dict = {
-                                    'total_number': self.kpi_measurements['total_number']['TOTAL'],
-                                    'success_number': self.kpi_measurements['success_number']['TOTAL']}
-                                self.upload_kpi('KPI.Mobility.TAU_SR', upload_dict)
-                                self.tau_req_flag = False
-
-                                # TAU latency
-                                delta_time = (log_item_dict['timestamp']-self.tau_req_timestamp).total_seconds()
-                                if delta_time >= 0:
-                                    upload_dict = {'latency': delta_time}
-                                    self.upload_kpi("KPI.Mobility.TAU_SR_LATENCY", upload_dict)
+                            # if field.get('name') == 'nas_eps.nas_msg_emm_type' and field.get('value') == '49' and self.tau_req_flag:
+                                
+                                    # self.upload_kpi("KPI.Mobility.TAU_SR_LATENCY", upload_dict)
 
                             # '4b' indicates Tracking area update reject
-                            elif field.get('name') == 'nas_eps.nas_msg_emm_type' and field.get('value') == '4b' and self.tau_req_flag:
+                            if field.get('name') == 'nas_eps.nas_msg_emm_type' and field.get('value') == '4b' and self.tau_req_flag:
                                 for child_field in proto.iter('field'):
                                     if child_field.get('name') == 'nas_eps.emm.cause':
                                         cause_idx = str(child_field.get('show'))
@@ -151,11 +162,12 @@ class TauSrAnalyzer(KpiAnalyzer):
                                             # self.log_info("TAU_SR: " + str(self.kpi_measurements))
                                             self.store_kpi("KPI_Retainability_TAU_REJ",
                                                            self.kpi_measurements['reject_number'], log_item_dict['timestamp'])
+
                                             upload_dict = {
                                                 'total_number': self.kpi_measurements['total_number']['TOTAL'],
                                                 'reject_number': self.kpi_measurements['reject_number']}
                                             # self.upload_kpi('KPI.Retainability.RRC_AB_REL', upload_dict, log_item_dict['timestamp'])
-                                            self.upload_kpi('KPI.Retainability.TAU_REJ', upload_dict)
+                                            # self.upload_kpi('KPI.Retainability.TAU_REJ', upload_dict)
                                         else:
                                             self.log_warning("Unknown EMM cause for TAU reject: " + cause_idx)
                                         self.tau_req_flag = False

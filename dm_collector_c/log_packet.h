@@ -4209,9 +4209,9 @@ const Fmt ModemDebug_Fmt[] = {
         {SKIP,           NULL,                   6},
 };
 
-bool is_log_packet(const char *b, size_t length);
-
-bool is_debug_packet(const char *b, size_t length);    //Yuanjie: test if it's a debugging message
+bool is_log_packet (const char *b, size_t length);
+bool is_debug_packet (const char *b, size_t length);   //Yuanjie: test if it's a debugging message
+bool is_custom_packet (const char *b, size_t length);
 
 bool is_custom_packet (const char *b, size_t length);
 
@@ -4222,6 +4222,7 @@ PyObject *decode_log_packet(const char *b, size_t length, bool skip_decoding);
 
 PyObject * decode_custom_packet (const char *b, size_t length);
 void decode_custom_packet_payload (const char *b, size_t length, PyObject* result);
+
 
 void on_demand_decode(const char *b, size_t length, LogPacketType type_id, PyObject *result);
 

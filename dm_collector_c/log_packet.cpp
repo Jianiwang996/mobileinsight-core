@@ -10220,7 +10220,8 @@ is_custom_packet (const char *b, size_t length) {
 }
 
 void
-on_demand_decode(const char *b, size_t length, LogPacketType type_id, PyObject *result) {
+on_demand_decode (const char *b, size_t length, LogPacketType type_id, PyObject* result)
+{
     int offset = 0;
     switch (type_id) {
         case CDMA_Paging_Channel_Message:
